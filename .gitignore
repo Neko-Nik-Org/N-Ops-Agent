@@ -1,0 +1,25 @@
+# Compiled binaries
+/bin/
+/dist/
+*.exe
+*.test
+*.out
+
+# Local AI assistant files (not part of the project)
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Secrets and local config — never commit
+*.key
+*.pem
+*.crt
+*.csr
+.env
+.env.*
