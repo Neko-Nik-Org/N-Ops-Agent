@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package agent.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/Neko-Nik-Org/N-Ops-Agent/gen/agent/v1;agentv1";
+
+service AgentService {
+  rpc Connect(stream ConnectRequest) returns (stream ConnectResponse);
+}
+
+message ConnectRequest {
+  oneof msg {
+    Hello hello = 1;
+    Heartbeat heartbeat = 2;
+  }
+}
+
+message Hello {
+  string server_id = 1; //TODO- change to mTLS
+  string agent_version = 2;
+  string hostname = 3;
+  string os = 4;
+  string arch = 5;
+}
+
+message Heartbeat {
+  google.protobuf.Timestamp sent_at = 1;
+  double cpu_percent = 2;
+  double memory_percent = 3;
+  int64 uptime_seconds = 4;
+}
+
+message ConnectResponse {
+  oneof msg {
+    Welcome welcome = 1;
+
+    HeartbeatAck heartbeat_ack = 2;
+  }
+}
+
+message Welcome {
+  int32 heartbeat_interval_seconds = 1;
+}
+
+message HeartbeatAck {
+  google.protobuf.Timestamp received_at = 1;
+}
