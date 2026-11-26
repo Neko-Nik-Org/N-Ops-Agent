@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"time"
 
 	agentv1 "github.com/Neko-Nik-Org/N-Ops-Agent/gen/agent/v1"
 	"google.golang.org/grpc"
@@ -15,11 +16,18 @@ import (
 
 type orchestrator struct {
 	agentv1.UnimplementedAgentServiceServer
+	reg *registry
 }
 
 func (o *orchestrator) Connect(stream agentv1.AgentService_ConnectServer) error {
 
 	var serverID string
+
+	defer func() {
+		if serverID != "" {
+			o.reg.markOffline(serverID, "agent disconnected")
+		}
+	}()
 
 	for {
 
@@ -49,10 +57,12 @@ func (o *orchestrator) Connect(stream agentv1.AgentService_ConnectServer) error 
 			if err != nil {
 				return err
 			}
+
+			o.reg.markOnline(serverID, m.Hello.GetHostname())
 		case *agentv1.ConnectRequest_Heartbeat:
 
 			if serverID == "" {
-				return status.Error(codes.NotFound, "Server id is required")
+				return status.Error(codes.FailedPrecondition, "Server id is required")
 			}
 
 			slog.Info("heartbeat received",
@@ -68,6 +78,7 @@ func (o *orchestrator) Connect(stream agentv1.AgentService_ConnectServer) error 
 			if err != nil {
 				return err
 			}
+			o.reg.recordHeartbeat(serverID, m.Heartbeat.GetCpuPercent(), m.Heartbeat.GetMemoryPercent())
 
 		default:
 			return status.Error(codes.InvalidArgument, "unknown message")
@@ -86,7 +97,10 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 
-	agentv1.RegisterAgentServiceServer(grpcServer, &orchestrator{})
+	reg := newRegistry()
+	go reg.runReaper(5*time.Second, 15*time.Second)
+
+	agentv1.RegisterAgentServiceServer(grpcServer, &orchestrator{reg: reg})
 
 	slog.Info("orchestrator listening", "addr", ":50051")
 	if err := grpcServer.Serve(lis); err != nil {
