@@ -3,17 +3,19 @@ package main
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"log/slog"
 	"math/rand/v2"
 	"os"
 	"runtime"
 	"time"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/types/known/timestamppb"
-
 	agentv1 "github.com/Neko-Nik-Org/N-Ops-Agent/gen/agent/v1"
+	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/shirou/gopsutil/v4/host"
+	"github.com/shirou/gopsutil/v4/mem"
 )
 
 const agentVersion = "0.1.0"
@@ -63,7 +65,7 @@ func run(serverID, hostname string) error {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		err = stream.Send(&agentv1.ConnectRequest{Msg: &agentv1.ConnectRequest_Heartbeat{Heartbeat: &agentv1.Heartbeat{SentAt: timestamppb.Now(), CpuPercent: 12.6, MemoryPercent: 28.4, UptimeSeconds: 102}}})
+		err = stream.Send(&agentv1.ConnectRequest{Msg: &agentv1.ConnectRequest_Heartbeat{Heartbeat: buildHeartbeat()}})
 
 		if err != nil {
 
@@ -80,6 +82,35 @@ func run(serverID, hostname string) error {
 
 	}
 	return nil
+}
+
+func buildHeartbeat() *agentv1.Heartbeat {
+	hb := &agentv1.Heartbeat{SentAt: timestamppb.Now()}
+	percents, err := cpu.Percent(0, false)
+
+	if err != nil {
+		slog.Warn("CPU percent failed", "err", err)
+	} else if len(percents) > 0 {
+		hb.CpuPercent = percents[0]
+	}
+
+	vm, err := mem.VirtualMemory()
+
+	if err != nil {
+		slog.Warn("Mem percent failed", "err", err)
+	} else {
+		hb.MemoryPercent = vm.UsedPercent
+	}
+
+	up, err := host.Uptime()
+	if err != nil {
+		slog.Warn("getting uptime failed", "err", err)
+	} else {
+		hb.UptimeSeconds = int64(up)
+	}
+
+	return hb
+
 }
 
 func main() {
