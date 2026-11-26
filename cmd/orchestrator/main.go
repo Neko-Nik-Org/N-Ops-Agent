@@ -2,7 +2,6 @@ package main
 
 import (
 	"io"
-	"log"
 	"log/slog"
 	"net"
 	"os"
@@ -81,7 +80,8 @@ func (o *orchestrator) Connect(stream agentv1.AgentService_ConnectServer) error 
 func main() {
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
-		log.Fatalf("faield to listen: %v", err)
+		slog.Error("faield to listen", "err", err)
+		os.Exit(1)
 	}
 
 	grpcServer := grpc.NewServer()
